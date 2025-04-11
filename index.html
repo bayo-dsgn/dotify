@@ -1,0 +1,224 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dot & Line Art Tool</title>
+  <style>
+    body {
+      background-color: #121212;
+      color: #f0f0f0;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      gap: 20px;
+    }
+    .controls {
+      max-width: 300px;
+      flex-shrink: 0;
+    }
+    canvas {
+      background-color: #222;
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #444;
+    }
+    input, select, button {
+      background: #1e1e1e;
+      color: white;
+      border: 1px solid #444;
+      margin: 5px 0;
+      padding: 5px;
+      width: 100%;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <h3>🎨 Dot & Line Art Tool</h3>
+    <input type="file" id="upload" accept="image/*" />
+
+    <label for="shape">Shape:</label>
+    <select id="shape">
+      <option value="circle">Circle</option>
+      <option value="rounded">Rounded Square</option>
+      <option value="square">Sharp Square</option>
+      <option value="hline">Horizontal Line</option>
+      <option value="vline">Vertical Line</option>
+      <option value="random">🎲 Mix</option>
+    </select>
+
+    <label for="dotSize">Base Size</label>
+    <input type="range" id="dotSize" min="4" max="30" value="10" />
+
+    <label for="spacing">Spacing</label>
+    <input type="range" id="spacing" min="4" max="50" value="20" />
+
+    <label for="scatter">Scatter</label>
+    <input type="range" id="scatter" min="0" max="1" step="0.01" value="1" />
+
+    <label for="randomness">Random Size</label>
+    <input type="range" id="randomness" min="0" max="1" step="0.01" value="0.3" />
+
+    <label for="lineWeight">Line Weight</label>
+    <input type="range" id="lineWeight" min="0.5" max="10" step="0.5" value="1.5" />
+
+    <label for="gridToggle">Fit to Grid:</label>
+    <input type="checkbox" id="gridToggle" checked />
+
+    <label for="bgColor">Background Color</label>
+    <input type="color" id="bgColor" value="#ffffff" />
+
+    <label for="previewSize">Preview Size (%)</label>
+    <input type="range" id="previewSize" min="20" max="150" value="100" />
+
+    <label for="exportQuality">Export Quality</label>
+    <select id="exportQuality">
+      <option value="0.25">Low</option>
+      <option value="0.5">Medium</option>
+      <option value="1" selected>High</option>
+      <option value="2">Highest</option>
+    </select>
+
+    <button id="downloadBtn">⬇️ Download PNG</button>
+  </div>
+
+  <div class="preview">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const upload = document.getElementById("upload");
+    const shapeInput = document.getElementById("shape");
+    const dotSizeInput = document.getElementById("dotSize");
+    const spacingInput = document.getElementById("spacing");
+    const scatterInput = document.getElementById("scatter");
+    const randomnessInput = document.getElementById("randomness");
+    const lineWeightInput = document.getElementById("lineWeight");
+    const gridToggle = document.getElementById("gridToggle");
+    const bgColorInput = document.getElementById("bgColor");
+    const previewSizeInput = document.getElementById("previewSize");
+    const exportQualityInput = document.getElementById("exportQuality");
+    const downloadBtn = document.getElementById("downloadBtn");
+
+    let image = new Image();
+
+    function randomShape() {
+      const shapes = ["circle", "rounded", "square", "hline", "vline"];
+      return shapes[Math.floor(Math.random() * shapes.length)];
+    }
+
+    function drawArt(targetCtx, scale = 1) {
+      const shape = shapeInput.value;
+      const dotSize = parseInt(dotSizeInput.value);
+      const spacing = parseInt(spacingInput.value);
+      const scatter = parseFloat(scatterInput.value);
+      const randomness = parseFloat(randomnessInput.value);
+      const lineWeight = parseFloat(lineWeightInput.value);
+      const fitToGrid = gridToggle.checked;
+      const bgColor = bgColorInput.value;
+
+      const width = image.width * scale;
+      const height = image.height * scale;
+
+      targetCtx.canvas.width = width;
+      targetCtx.canvas.height = height;
+      targetCtx.drawImage(image, 0, 0, width, height);
+      const imgData = targetCtx.getImageData(0, 0, width, height);
+      const data = imgData.data;
+
+      targetCtx.fillStyle = bgColor;
+      targetCtx.fillRect(0, 0, width, height);
+
+      for (let y = 0; y < height; y += spacing) {
+        for (let x = 0; x < width; x += spacing) {
+          let jitterX = fitToGrid ? x : x + (Math.random() - 0.5) * spacing * scatter;
+          let jitterY = fitToGrid ? y : y + (Math.random() - 0.5) * spacing * scatter;
+
+          const px = Math.floor(jitterX);
+          const py = Math.floor(jitterY);
+          const index = (py * width + px) * 4;
+          const r = data[index];
+          const g = data[index + 1];
+          const b = data[index + 2];
+          const brightness = (r + g + b) / 3;
+          const colorWeight = 1 - brightness / 255;
+          const sizeVariation = Math.random() * randomness * dotSize;
+          const size = dotSize * colorWeight + sizeVariation;
+          const fill = `rgb(${r}, ${g}, ${b})`;
+          const currentShape = shape === "random" ? randomShape() : shape;
+
+          targetCtx.fillStyle = fill;
+          if (currentShape === "circle") {
+            targetCtx.beginPath();
+            targetCtx.arc(jitterX, jitterY, size / 2, 0, Math.PI * 2);
+            targetCtx.fill();
+          } else if (currentShape === "square") {
+            targetCtx.fillRect(jitterX - size / 2, jitterY - size / 2, size, size);
+          } else if (currentShape === "rounded") {
+            targetCtx.beginPath();
+            targetCtx.moveTo(jitterX - size / 2 + 4, jitterY - size / 2);
+            targetCtx.lineTo(jitterX + size / 2 - 4, jitterY - size / 2);
+            targetCtx.quadraticCurveTo(jitterX + size / 2, jitterY - size / 2, jitterX + size / 2, jitterY - size / 2 + 4);
+            targetCtx.lineTo(jitterX + size / 2, jitterY + size / 2 - 4);
+            targetCtx.quadraticCurveTo(jitterX + size / 2, jitterY + size / 2, jitterX + size / 2 - 4, jitterY + size / 2);
+            targetCtx.lineTo(jitterX - size / 2 + 4, jitterY + size / 2);
+            targetCtx.quadraticCurveTo(jitterX - size / 2, jitterY + size / 2, jitterX - size / 2, jitterY + size / 2 - 4);
+            targetCtx.lineTo(jitterX - size / 2, jitterY - size / 2 + 4);
+            targetCtx.quadraticCurveTo(jitterX - size / 2, jitterY - size / 2, jitterX - size / 2 + 4, jitterY - size / 2);
+            targetCtx.closePath();
+            targetCtx.fill();
+          } else if (currentShape === "hline") {
+            targetCtx.fillRect(jitterX - size / 2, jitterY - lineWeight / 2, size, lineWeight);
+          } else if (currentShape === "vline") {
+            targetCtx.fillRect(jitterX - lineWeight / 2, jitterY - size / 2, lineWeight, size);
+          }
+        }
+      }
+    }
+
+    function updatePreviewSize() {
+      canvas.style.width = previewSizeInput.value + "%";
+    }
+
+    upload.addEventListener("change", (e) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        image.src = event.target.result;
+      };
+      reader.readAsDataURL(e.target.files[0]);
+    });
+
+    image.onload = () => {
+      drawArt(ctx);
+    };
+
+    previewSizeInput.addEventListener("input", updatePreviewSize);
+    [
+      shapeInput, dotSizeInput, spacingInput, scatterInput,
+      randomnessInput, lineWeightInput, gridToggle, bgColorInput
+    ].forEach(input => input.addEventListener("input", () => image.src && drawArt(ctx)));
+
+    downloadBtn.addEventListener("click", () => {
+      const scale = parseFloat(exportQualityInput.value);
+      const exportCanvas = document.createElement("canvas");
+      const exportCtx = exportCanvas.getContext("2d");
+      drawArt(exportCtx, scale);
+      const link = document.createElement("a");
+      link.download = "dot_art.png";
+      link.href = exportCanvas.toDataURL("image/png");
+      link.click();
+    });
+
+    updatePreviewSize();
+  </script>
+</body>
+</html>
