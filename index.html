@@ -86,6 +86,8 @@
     </select>
 
     <button id="downloadBtn">⬇️ Download PNG</button>
+    <button id="downloadTransparentBtn">⬇️ Transparent PNG</button>
+    <button id="downloadSvgBtn">⬇️ Download SVG</button>
   </div>
 
   <div class="preview">
@@ -116,7 +118,7 @@
       return shapes[Math.floor(Math.random() * shapes.length)];
     }
 
-    function drawArt(targetCtx, scale = 1) {
+    function drawArt(targetCtx, scale = 1, transparent = false) {
       const shape = shapeInput.value;
       const dotSize = parseInt(dotSizeInput.value);
       const spacing = parseInt(spacingInput.value);
@@ -135,8 +137,8 @@
       const imgData = targetCtx.getImageData(0, 0, width, height);
       const data = imgData.data;
 
-      targetCtx.fillStyle = bgColor;
-      targetCtx.fillRect(0, 0, width, height);
+      if (!transparent) { targetCtx.fillStyle = bgColor; }
+      if (!transparent) targetCtx.fillRect(0, 0, width, height);
 
       for (let y = 0; y < height; y += spacing) {
         for (let x = 0; x < width; x += spacing) {
@@ -219,6 +221,72 @@
     });
 
     updatePreviewSize();
+    const downloadTransparentBtn = document.getElementById("downloadTransparentBtn");
+    const downloadSvgBtn = document.getElementById("downloadSvgBtn");
+
+    downloadTransparentBtn.addEventListener("click", () => {
+      const scale = parseFloat(exportQualityInput.value);
+      const exportCanvas = document.createElement("canvas");
+      const exportCtx = exportCanvas.getContext("2d");
+      drawArt(exportCtx, scale, true);
+      const link = document.createElement("a");
+      link.download = "dot_art_transparent.png";
+      link.href = exportCanvas.toDataURL("image/png");
+      link.click();
+    });
+
+    downloadSvgBtn.addEventListener("click", () => {
+      const shape = shapeInput.value;
+      const dotSize = parseInt(dotSizeInput.value);
+      const spacing = parseInt(spacingInput.value);
+      const scatter = parseFloat(scatterInput.value);
+      const randomness = parseFloat(randomnessInput.value);
+      const lineWeight = parseFloat(lineWeightInput.value);
+      const fitToGrid = gridToggle.checked;
+
+      const svgShapes = [];
+      const width = image.width;
+      const height = image.height;
+
+      const svgBg = bgColorInput.value;
+      for (let y = 0; y < height; y += spacing) {
+        for (let x = 0; x < width; x += spacing) {
+          let jitterX = fitToGrid ? x : x + (Math.random() - 0.5) * spacing * scatter;
+          let jitterY = fitToGrid ? y : y + (Math.random() - 0.5) * spacing * scatter;
+
+          const px = Math.floor(jitterX);
+          const py = Math.floor(jitterY);
+          const index = (py * width + px) * 4;
+          const r = ctx.getImageData(0, 0, canvas.width, canvas.height).data[index];
+          const g = ctx.getImageData(0, 0, canvas.width, canvas.height).data[index + 1];
+          const b = ctx.getImageData(0, 0, canvas.width, canvas.height).data[index + 2];
+          const brightness = (r + g + b) / 3;
+          const colorWeight = 1 - brightness / 255;
+          const sizeVariation = Math.random() * randomness * dotSize;
+          const size = dotSize * colorWeight + sizeVariation;
+          const fill = `rgb(${r},${g},${b})`;
+          const currentShape = shape === "random" ? ["circle", "square", "hline", "vline"][Math.floor(Math.random() * 4)] : shape;
+
+          if (currentShape === "circle") {
+            svgShapes.push(`<circle cx="${jitterX}" cy="${jitterY}" r="${size/2}" fill="${fill}" />`);
+          } else if (currentShape === "square") {
+            svgShapes.push(`<rect x="${jitterX - size/2}" y="${jitterY - size/2}" width="${size}" height="${size}" fill="${fill}" />`);
+          } else if (currentShape === "hline") {
+            svgShapes.push(`<rect x="${jitterX - size/2}" y="${jitterY - lineWeight/2}" width="${size}" height="${lineWeight}" fill="${fill}" />`);
+          } else if (currentShape === "vline") {
+            svgShapes.push(`<rect x="${jitterX - lineWeight/2}" y="${jitterY - size/2}" width="${lineWeight}" height="${size}" fill="${fill}" />`);
+          }
+        }
+      }
+
+      const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" style="background:${svgBg}">${svgShapes.join("")}</svg>`;
+      const blob = new Blob([svgContent], {type: "image/svg+xml"});
+      const link = document.createElement("a");
+      link.download = "dot_art.svg";
+      link.href = URL.createObjectURL(blob);
+      link.click();
+    });
+
   </script>
 </body>
 </html>
